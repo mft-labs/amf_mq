@@ -172,7 +172,8 @@ func (mq *MQType) Put(qname string, data []byte) error {
 	od.ObjectType = ibmmq.MQOT_Q
 	od.ObjectName = qname
 	md := ibmmq.NewMQMD()
-	md.Format = ibmmq.MQFMT_STRING
+	//md.Format = ibmmq.MQFMT_STRING
+	md.Format = "MQSTR"
 	md.Encoding = ibmmq.MQENC_NATIVE
 	md.ApplIdentityData = "AMFv1.0"
 	md.MsgType = ibmmq.MQMT_DATAGRAM
