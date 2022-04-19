@@ -119,12 +119,16 @@ func (nmq *NMQType2) Put(qname string, data []byte) (err error) {
 
 func (nmq *NMQType2) ReSubscribe() error {
 	var err error
-	if nmq.sub != nil {
+	/*if nmq.sub != nil {
 		nmq.sub.Unsubscribe()
 		nmq.sub.Drain()
-	}
+	}*/
 	nmq.sub, err = nmq.js2.SubscribeSync(nmq.inputq+".*", nats.Durable("monitor"), nats.MaxDeliver(1))
+	if err!=nil {
+		fmt.Printf("Error occurred in resubscribe:%v\n",err)
+	}
 	if err!=nil && strings.Contains(err.Error(),"nats: no stream matches subject") {
+		fmt.Printf("Error occurred :%v\n Adding stream again\n",err)
 		nmq.js2.AddStream(&nats.StreamConfig{
 			Name:     nmq.inputq,
 			Subjects: []string{nmq.inputq+".*"},
@@ -134,6 +138,9 @@ func (nmq *NMQType2) ReSubscribe() error {
 	}
 	if err!=nil && strings.Contains(err.Error(),"consumer is already bound to a subscription") {
 		return nil
+	}
+	if err!=nil {
+		fmt.Printf("Error occurred in resubscribe(2):%v\n",err)
 	}
 	return err
 }
@@ -162,9 +169,9 @@ func (nmq *NMQType2) Get(wait int64) (data []byte, err error) {
 	nmq.msg = msg
 	//nmq.con2.Publish(msg.Reply,[]byte("Received"))
 	if msg == nil {
-		return []byte(""), nil
+		return []byte(""), err
 	}
-	return msg.Data, nil
+	return msg.Data, err
 }
 
 func (nmq *NMQType2) Ping() bool  {
