@@ -148,10 +148,10 @@ func (nmq *NMQType2) Backout() error {
 }
 
 func (nmq *NMQType2) Disconnect() error {
-	if nmq.sub != nil {
+	/*if nmq.sub != nil {
 		nmq.sub.Unsubscribe()
 		nmq.sub.Drain()
-	}
+	}*/
 	if nmq.con1 != nil {
 		nmq.con1.Close()
 	}
@@ -165,10 +165,12 @@ func (nmq *NMQType2) Disconnect() error {
 }
 
 func (nmq *NMQType2) Close() error {
-	if nmq.sub != nil {
+	// https://docs.nats.io/legacy/stan/intro/channels/subscriptions/durable
+	// Durable: When the application wants to stop receiving messages on a durable subscription, it should close - but not unsubscribe - this subscription
+	/*if nmq.sub != nil {
 		nmq.sub.Unsubscribe()
 		nmq.sub.Drain()
-	}
+	}*/
 	if nmq.con1 != nil {
 		nmq.con1.Close()
 	}
