@@ -117,70 +117,18 @@ func (nmq *NMQType2) Put(qname string, data []byte) (err error) {
 	return err
 }
 
-func (nmq *NMQType2) ReSubscribe() error {
-	var err error
-	if nmq.sub != nil {
-		nmq.Close()
-	}
-	err = nmq.OpenQueue(nmq.inputq)
-	return err
-}
-
-/*func (nmq *NMQType2) ReSubscribe2() error {
-	var err error
-	if nmq.sub != nil {
-		//nmq.sub.Unsubscribe()
-		//nmq.sub.Drain()
-		nmq.Close()
-		nmq.OpenQueue(nmq.inputq)
-	}
-	nmq.sub, err = nmq.js2.SubscribeSync(nmq.inputq+".*", nats.Durable("monitor"), nats.MaxDeliver(1))
-	if err!=nil {
-		fmt.Printf("Error occurred in resubscribe:%v\n",err)
-	}
-	if err!=nil && strings.Contains(err.Error(),"nats: no stream matches subject") {
-		fmt.Printf("Error occurred :%v\n Adding stream again\n",err)
-		nmq.js2.AddStream(&nats.StreamConfig{
-			Name:     nmq.inputq,
-			Subjects: []string{nmq.inputq+".*"},
-		})
-
-		nmq.sub, err = nmq.js2.SubscribeSync(nmq.inputq+".*", nats.Durable("monitor"), nats.MaxDeliver(1))
-	}
-	if err!=nil && strings.Contains(err.Error(),"consumer is already bound to a subscription") {
-		return nil
-	}
-	if err!=nil {
-		fmt.Printf("Error occurred in resubscribe(2):%v\n",err)
-	}
-	return err
-} */
-
 func (nmq *NMQType2) Get(wait int64) (data []byte, err error) {
 	msg, err := nmq.sub.NextMsg(time.Second*time.Duration(wait))
 	if err!=nil {
-		/*if strings.Contains(err.Error(),"nats: timeout") {
-			return nil, nil
-		}
-		return nil, err*/
 		if strings.Contains(err.Error(),"nats: timeout") || strings.Contains(err.Error(),"nats: invalid subscription")  {
-			fmt.Printf("Error received:%v\n",err)
-			if strings.Contains(err.Error(),"invalid subscription") {
-				err = nmq.ReSubscribe()
-				if err==nil {
-					fmt.Printf("Retrying to get message")
-					msg, err = nmq.sub.NextMsg(time.Second*time.Duration(wait))
-				}
-			} else {
 				return nil, nil
-			}
-
+		} else {
+			return nil, err
 		}
 	}
 	nmq.msg = msg
-	//nmq.con2.Publish(msg.Reply,[]byte("Received"))
 	if msg == nil {
-		return []byte(""), err
+		return nil, err
 	}
 	return msg.Data, err
 }
