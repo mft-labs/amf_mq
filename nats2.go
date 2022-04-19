@@ -161,6 +161,9 @@ func (nmq *NMQType2) Get(wait int64) (data []byte, err error) {
 	}
 	nmq.msg = msg
 	//nmq.con2.Publish(msg.Reply,[]byte("Received"))
+	if msg == nil {
+		return []byte(""), nil
+	}
 	return msg.Data, nil
 }
 
