@@ -119,10 +119,21 @@ func (nmq *NMQType2) Put(qname string, data []byte) (err error) {
 
 func (nmq *NMQType2) ReSubscribe() error {
 	var err error
-	/*if nmq.sub != nil {
-		nmq.sub.Unsubscribe()
-		nmq.sub.Drain()
-	}*/
+	if nmq.sub != nil {
+		nmq.Close()
+	}
+	err = nmq.OpenQueue(nmq.inputq)
+	return err
+}
+
+/*func (nmq *NMQType2) ReSubscribe2() error {
+	var err error
+	if nmq.sub != nil {
+		//nmq.sub.Unsubscribe()
+		//nmq.sub.Drain()
+		nmq.Close()
+		nmq.OpenQueue(nmq.inputq)
+	}
 	nmq.sub, err = nmq.js2.SubscribeSync(nmq.inputq+".*", nats.Durable("monitor"), nats.MaxDeliver(1))
 	if err!=nil {
 		fmt.Printf("Error occurred in resubscribe:%v\n",err)
@@ -143,7 +154,7 @@ func (nmq *NMQType2) ReSubscribe() error {
 		fmt.Printf("Error occurred in resubscribe(2):%v\n",err)
 	}
 	return err
-}
+} */
 
 func (nmq *NMQType2) Get(wait int64) (data []byte, err error) {
 	msg, err := nmq.sub.NextMsg(time.Second*time.Duration(wait))
