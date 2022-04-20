@@ -71,7 +71,7 @@ func (nmq *NMQType2) Connect(shared bool) error {
 		nmq.con2 = nil
 		return err
 	}
-	nmq.js2, err = nmq.con2.JetStream(nats.PublishAsyncMaxPending(2048))
+	nmq.js2, err = nmq.con2.JetStream()
 	if err!=nil {
 		nmq.con1.Close()
 		nmq.con2.Close()
@@ -88,44 +88,88 @@ func (nmq *NMQType2) OpenQueue(qname string) error {
 	nmq.inputq = qname
 	var err error
 	//nmq.sub, err = nmq.con2.SubscribeSync(qname)
-	nmq.sub, err = nmq.js2.SubscribeSync(qname+".*", nats.Durable("monitor"), nats.MaxDeliver(1))
+	//earlierSubcriber := nmq.sub
+	newSub, err := nmq.js2.SubscribeSync(qname+".*", nats.Durable("MONITOR"), nats.MaxDeliver(1))
+	//newSub, err := nmq.js2.SubscribeSync(qname+".*")
+	if err!=nil {
+		fmt.Printf("Error occurred:%v\n",err)
+	}
 	if err!=nil && strings.Contains(err.Error(),"nats: no stream matches subject") {
 		nmq.js2.AddStream(&nats.StreamConfig{
 			Name:     qname,
 			Subjects: []string{qname+".*"},
 		})
+		nmq.js2.AddConsumer(qname, &nats.ConsumerConfig{
+			Durable: "MONITOR",
+		})
 
-		nmq.sub, err = nmq.js2.SubscribeSync(qname+".*", nats.Durable("monitor"), nats.MaxDeliver(1))
+
+		newSub, err = nmq.js2.SubscribeSync(qname+".*", nats.Durable("MONITOR"), nats.MaxDeliver(1))
+		//newSub, err = nmq.js2.SubscribeSync(qname+".*")
 	}
 	if err!=nil && strings.Contains(err.Error(),"consumer is already bound to a subscription") {
-		return nil
+		fmt.Printf("Clear existing consumer\n")
+		nmq.js2.DeleteConsumer(qname, "MONITOR")
+		nmq.js2.DeleteStream(qname)
+		nmq.js2.AddStream(&nats.StreamConfig{
+			Name:     qname,
+			Subjects: []string{qname+".*"},
+		})
+		nmq.js2.AddConsumer(qname, &nats.ConsumerConfig{
+			Durable: "MONITOR",
+		})
+
+
+		newSub, err = nmq.js2.SubscribeSync(qname+".*", nats.Durable("MONITOR"), nats.MaxDeliver(1))
+		if err!=nil {
+			fmt.Printf("Error occurred while re-establish subscribte info:%v\n",err)
+			return err
+		}
+		fmt.Printf("Re-established connection successfully\n")
+
+
 	}
+	if newSub !=nil  {
+		fmt.Printf("Assigning new subscriber\n")
+		nmq.sub = newSub
+	}
+
 	return err
 }
 
 func (nmq *NMQType2) Put(qname string, data []byte) (err error) {
 	_, err = nmq.js1.PublishAsync(qname+".scratch", data)
 	if err!=nil {
+		fmt.Printf("Error occurred while put message:%v\n",err)
 		if strings.Contains(err.Error(),"nats: no stream matches subject") {
 			nmq.js1.AddStream(&nats.StreamConfig{
 				Name:     qname,
 				Subjects: []string{qname+".*"},
 			})
+			nmq.js1.AddConsumer(qname, &nats.ConsumerConfig{
+				Durable: "MONITOR",
+			})
 			_, err = nmq.js1.PublishAsync(qname+".scratch", data)
 		}
 	}
+	fmt.Printf("Error status:%v in put\n",err)
 	return err
 }
 
 func (nmq *NMQType2) Get(wait int64) (data []byte, err error) {
 	msg, err := nmq.sub.NextMsg(time.Second*time.Duration(wait))
 	if err!=nil {
-		if strings.Contains(err.Error(),"nats: timeout") || strings.Contains(err.Error(),"nats: invalid subscription")  {
-				return nil, nil
+		if strings.Contains(err.Error(),"nats: timeout") {
+			return nil, nil
+		}
+		/*if strings.Contains(err.Error(),"nats: timeout") || strings.Contains(err.Error(),"nats: invalid subscription")  {
+				return nil, err
 		} else {
 			return nil, err
-		}
+		} */
+		return nil, err
 	}
+
 	nmq.msg = msg
 	if msg == nil {
 		return nil, err
@@ -151,10 +195,19 @@ func (nmq *NMQType2) Backout() error {
 }
 
 func (nmq *NMQType2) Disconnect() error {
-	/*if nmq.sub != nil {
-		nmq.sub.Unsubscribe()
-		nmq.sub.Drain()
-	}*/
+
+	if nmq.sub != nil {
+		err := nmq.sub.Unsubscribe()
+		if err!=nil {
+			fmt.Printf("Error occurred while unsubscribe:%v",err)
+			return err
+		}
+		err = nmq.sub.Drain()
+		if err!=nil {
+			fmt.Printf("Error occurred while draining:%v",err)
+			return err
+		}
+	}
 	if nmq.con1 != nil {
 		nmq.con1.Close()
 	}
